@@ -1,4 +1,4 @@
-module github.com/Monibuca/plugin-onvif
+module github.com/Monibuca/plugin-onvif/v3
 
 go 1.16
 
