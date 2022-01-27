@@ -7,7 +7,7 @@
 配置如下：
 ```toml
 [ONVIF]
-DiscoverInterval = 30 # 发现设备的间隔，单位秒，默认30秒
+DiscoverInterval = 30 # 发现设备的间隔，单位秒，默认30秒，建议比rtsp插件的重连间隔大点
 # 设备发现指定网卡，以及该网卡对应IP段的全局默认账号密码
 [[ONVIF.interfaces]]
 InterfaceName = "WLAN" #或者 以太网  eth0 等
