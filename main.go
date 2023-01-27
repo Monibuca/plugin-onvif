@@ -1,23 +1,47 @@
 package onvif
 
 import (
+	. "m7s.live/engine/v4"
 	"time"
-
-	. "github.com/Monibuca/engine/v3"
 )
 
-var config struct {
-	DiscoverInterval int `toml:"DiscoverInterval"`
+type OnvifConfig struct {
+	DiscoverInterval int
 	Interfaces       []struct {
-		InterfaceName string `toml:"InterfaceName"`
-		Username      string `toml:"Username"`
-		Password      string `toml:"Password"`
-	} `toml:"interfaces"`
+		InterfaceName string
+		Username      string
+		Password      string
+	}
 	Devices []struct {
-		IP       string `toml:"Ip"`
-		Username string `toml:"Username"`
-		Password string `toml:"Password"`
-	} `toml:"devices"`
+		IP       string
+		Username string
+		Password string
+	}
+}
+
+func (o *OnvifConfig) init() {
+	preprocessAuth(authCfg)
+	if o.DiscoverInterval == 0 {
+		o.DiscoverInterval = 30
+	}
+	go func() {
+		deviceList.discoveryDevice()
+		deviceList.pullStream()
+	}()
+	t := time.NewTicker(time.Duration(o.DiscoverInterval) * time.Second)
+	go func() {
+		for range t.C {
+			deviceList.discoveryDevice()
+			deviceList.pullStream()
+		}
+	}()
+}
+
+func (o *OnvifConfig) OnEvent(event any) {
+	switch event.(type) {
+	case FirstConfig:
+		o.init()
+	}
 }
 
 var authCfg = &AuthConfig{
@@ -27,37 +51,17 @@ var authCfg = &AuthConfig{
 
 var deviceList = &DeviceList{Data: make(map[string]map[string]*DeviceStatus)}
 
-func init() {
-	pconfig := PluginConfig{
-		Name:   "ONVIF",
-		Config: &config,
-	}
-	pconfig.Install(runPlugin)
-}
-
-func runPlugin() {
-	preprocessAuth(authCfg)
-	if config.DiscoverInterval == 0 {
-		config.DiscoverInterval = 30
-	}
-	t := time.NewTicker(time.Duration(config.DiscoverInterval) * time.Second)
-	go func() {
-		for range t.C {
-			deviceList.discoveryDevice()
-			deviceList.pullStream()
-		}
-	}()
-
-}
+var conf = &OnvifConfig{}
+var plugin = InstallPlugin(conf)
 
 func preprocessAuth(c *AuthConfig) {
-	for _, i := range config.Interfaces {
+	for _, i := range conf.Interfaces {
 		c.Interfaces[i.InterfaceName] = deviceAuth{
 			Username: i.Username,
 			Password: i.Password,
 		}
 	}
-	for _, d := range config.Devices {
+	for _, d := range conf.Devices {
 		c.Devices[d.IP] = deviceAuth{
 			Username: d.Username,
 			Password: d.Password,
