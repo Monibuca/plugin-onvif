@@ -6,6 +6,7 @@
 
 # 预览onvif流
 打开m7s `/preview` 界面，onvif 设备视频流如下图所示，格式为：`onvif/ip_port` 
+
 ![image](https://user-images.githubusercontent.com/1883728/215057255-ccaf0359-df7d-48a5-9336-754a4ca1b8f8.png)
 
 
