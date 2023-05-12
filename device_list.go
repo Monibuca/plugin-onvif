@@ -3,14 +3,25 @@ package onvif
 import (
 	"m7s.live/engine/v4"
 	"m7s.live/engine/v4/log"
+	"reflect"
 	"strings"
+	"unsafe"
 
-	lonvif "github.com/liyanhui1998/go-onvif"
+	lonvif "github.com/IOTechSystems/onvif"
 	rtsp "m7s.live/plugin/rtsp/v4"
 )
 
 type DeviceList struct {
 	Data map[string]map[string]*DeviceStatus
+}
+
+func changeDeviceParam(d *lonvif.Device, param lonvif.DeviceParams) {
+	pointerVal := reflect.ValueOf(d)
+	val := reflect.Indirect(pointerVal)
+	member := val.FieldByName("params")
+	ptrToY := unsafe.Pointer(member.UnsafeAddr())
+	realPtrToY := (*lonvif.DeviceParams)(ptrToY)
+	*realPtrToY = param
 }
 
 func (dl *DeviceList) discoveryDevice() {
@@ -25,7 +36,7 @@ func (dl *DeviceList) discoveryDevice() {
 
 		for _, dParam := range deviceParams {
 			// 如果已经存在，则不再添加
-			if _, ok := devsMap[dParam.Ipddr]; ok {
+			if _, ok := devsMap[dParam.Xaddr]; ok {
 				continue
 			}
 			var dev *lonvif.Device
@@ -36,11 +47,10 @@ func (dl *DeviceList) discoveryDevice() {
 				devStatus.Status = StatusInitOk
 			} else {
 				devStatus.Status = StatusInitError
-				devStatus.Device = &lonvif.Device{
-					Params: dParam,
-				}
+				devStatus.Device = &lonvif.Device{}
+				changeDeviceParam(devStatus.Device, dParam) // todo 之前返回了 DeviceParam 是否有必要，不记得了
 			}
-			devsMap[dParam.Ipddr] = devStatus
+			devsMap[dParam.Xaddr] = devStatus
 		}
 	}
 }
@@ -48,7 +58,7 @@ func (dl *DeviceList) discoveryDevice() {
 func (dl *DeviceList) pullStream() {
 	for _, devicesMap := range dl.Data {
 		for _, d := range devicesMap {
-			streamPath := strings.ReplaceAll(d.Device.Params.Ipddr, ".", "_")
+			streamPath := strings.ReplaceAll(d.Device.GetDeviceParams().Xaddr, ".", "_")
 			streamPath = "onvif/" + strings.ReplaceAll(streamPath, ":", "_")
 			//避免重复拉流
 			if engine.Streams.Has(streamPath) {

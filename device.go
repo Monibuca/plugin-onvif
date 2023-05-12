@@ -2,15 +2,20 @@ package onvif
 
 import (
 	"fmt"
-	"io/ioutil"
+	"github.com/IOTechSystems/onvif/media"
+	wsdiscovery "github.com/IOTechSystems/onvif/ws-discovery"
+	"github.com/IOTechSystems/onvif/xsd/onvif"
+
+	//"github.com/videonext/onvif/profiles/media"
+	"io"
 	"strings"
 
+	lonvif "github.com/IOTechSystems/onvif"
 	"github.com/beevik/etree"
-	lonvif "github.com/liyanhui1998/go-onvif"
-	"github.com/videonext/onvif/profiles/media"
+	//"github.com/videonext/onvif/profiles/media"
 )
 
-//设备状态
+// 设备状态
 const (
 	StatusInitOk = iota
 	StatusInitError
@@ -36,7 +41,8 @@ type DeviceStatus struct {
 
 func WsDiscover(interfaceName string, config *AuthConfig) []lonvif.DeviceParams {
 	/* Call an ws-discovery Probe Message to Discover NVT type Devices */
-	devices := lonvif.SendProbe(interfaceName, nil, []string{"dn:" + lonvif.NVT.String()}, map[string]string{"dn": "http://www.lonvif.org/ver10/network/wsdl"})
+
+	devices := wsdiscovery.SendProbe(interfaceName, nil, []string{"dn:NetworkVideoTransmitter"}, map[string]string{"dn": "http://www.onvif.org/ver10/network/wsdl"})
 	nvtDevices := make([]lonvif.DeviceParams, 0)
 
 	for _, j := range devices {
@@ -50,7 +56,7 @@ func WsDiscover(interfaceName string, config *AuthConfig) []lonvif.DeviceParams 
 			xaddr := strings.Split(strings.Split(xaddr.Text(), " ")[0], "/")[2]
 			ip := strings.Split(xaddr, " ")[0]
 			auth := getDeviceAuth(interfaceName, ip, config)
-			nvtDevices = append(nvtDevices, lonvif.DeviceParams{Ipddr: ip, Username: auth.Username, Password: auth.Password})
+			nvtDevices = append(nvtDevices, lonvif.DeviceParams{Xaddr: ip, Username: auth.Username, Password: auth.Password})
 		}
 	}
 	return nvtDevices
@@ -61,7 +67,7 @@ func GetStreamUri(dev *lonvif.Device) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	resp, err := ioutil.ReadAll(Response.Body)
+	resp, err := io.ReadAll(Response.Body)
 	if err != nil {
 		return "", err
 	}
@@ -79,8 +85,9 @@ func GetStreamUri(dev *lonvif.Device) (string, error) {
 	if profileToken == "" {
 		return "", fmt.Errorf("error:%s", "profile token is empty")
 	}
-	Response, _ = dev.CallMethod(media.GetStreamUri{ProfileToken: media.ReferenceToken(profileToken)})
-	resp, err = ioutil.ReadAll(Response.Body)
+	pt := onvif.ReferenceToken(profileToken)
+	Response, _ = dev.CallMethod(media.GetStreamUri{ProfileToken: &pt})
+	resp, err = io.ReadAll(Response.Body)
 	if err != nil {
 		return "", err
 	}
@@ -99,14 +106,14 @@ func GetStreamUri(dev *lonvif.Device) (string, error) {
 		fmt.Println("mediaUri:", mediaUri)
 		return "", fmt.Errorf("error:%s", "media uri is not rtsp")
 	}
-	if !strings.Contains(mediaUri, "@") && dev.Params.Username != "" {
+	if !strings.Contains(mediaUri, "@") && dev.GetDeviceParams().Username != "" {
 		//如果返回的rtsp里没有账号密码，则自己拼接
-		mediaUri = strings.Replace(mediaUri, "//", fmt.Sprintf("//%s:%s@", dev.Params.Username, dev.Params.Password), 1)
+		mediaUri = strings.Replace(mediaUri, "//", fmt.Sprintf("//%s:%s@", dev.GetDeviceParams().Username, dev.GetDeviceParams().Password), 1)
 	}
 	return mediaUri, nil
 }
 
-//获取设备的账号密码
+// 获取设备的账号密码
 func getDeviceAuth(interfaceName string, ip string, config *AuthConfig) deviceAuth {
 	var auth deviceAuth
 	if a, ok := config.Interfaces[interfaceName]; ok {
